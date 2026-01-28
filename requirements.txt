@@ -1,0 +1,6 @@
+requests==2.31.0
+pydantic-settings==2.12.0
+python-dotenv==1.0.1
+loguru==0.7.3
+colorama==0.4.6
+astral==3.2
