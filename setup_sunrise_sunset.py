@@ -1,7 +1,8 @@
 import sys
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
-from astral import LocationInfo
+from astral import Observer
 from astral.sun import sun
 from colorama import init as colorama_init
 from loguru import logger
@@ -43,13 +44,14 @@ def show_existing_schedules(client: ShellyClient) -> list:
 
 
 def calculate_sunrise_sunset_times(config: ShellyConfig) -> tuple[datetime, datetime]:
-    location = LocationInfo("Home", "Estonia", config.timezone, config.latitude, config.longitude)
+    observer = Observer(latitude=config.latitude, longitude=config.longitude)
 
     logger.info("Calculating today's sunrise/sunset times...")
     logger.info("")
 
-    today = datetime.now()
-    s = sun(location.observer, date=today)
+    tz = ZoneInfo(config.timezone)
+    today = datetime.now(tz)
+    s = sun(observer, date=today, tzinfo=tz)
 
     sunrise_time = s['sunrise'] + timedelta(minutes=config.sunrise_offset)
     sunset_time = s['sunset']
@@ -110,8 +112,6 @@ def show_summary(config: ShellyConfig, sunrise_time: datetime, sunset_time: date
 
     logger.info("")
     logger.info("Note: Times will drift ~2 minutes per day as sunrise/sunset changes")
-    logger.warning("Run this script weekly or monthly to update schedule times!")
-    logger.info("Add to crontab: 0 1 * * 0 cd /path/to/shelly-automation && .venv/bin/python setup_sunrise_sunset.py")
 
 
 def main() -> None:
@@ -126,7 +126,6 @@ def main() -> None:
 
         show_existing_schedules(client)
 
-        client.configure_location(config.latitude, config.longitude, config.timezone)
         client.delete_all_schedules()
 
         sunrise_time, sunset_time = calculate_sunrise_sunset_times(config)

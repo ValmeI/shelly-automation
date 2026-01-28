@@ -68,22 +68,6 @@ class ShellyClient:
         logger.debug("Fetching device status...")
         return self._rpc_call("Shelly.GetStatus")
 
-    def configure_location(self, latitude: float, longitude: float, timezone: str) -> None:
-        """
-        Configure device location for sunrise/sunset calculations.
-
-        Args:
-            latitude: Location latitude
-            longitude: Location longitude
-            timezone: Timezone string (e.g., 'Europe/Tallinn')
-        """
-        logger.info(f"Configuring location: lat={latitude}, lon={longitude}, tz={timezone}")
-
-        params = {"config": {"location": {"lat": latitude, "lon": longitude, "tz": timezone}}}
-
-        self._rpc_call("Sys.SetConfig", params)
-        logger.success("Location configured successfully")
-
     def list_schedules(self) -> List[Dict[str, Any]]:
         """List all schedules."""
         logger.info("Fetching schedule list from device...")
