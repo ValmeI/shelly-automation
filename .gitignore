@@ -4,6 +4,9 @@ config.yaml
 # Logs
 logs/
 
+# direnv
+.direnv/
+
 # Python
 __pycache__/
 *.py[cod]
