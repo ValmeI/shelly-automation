@@ -65,7 +65,7 @@ def calculate_sunrise_sunset_times(config: ShellyConfig) -> tuple[datetime, date
 
 def create_recurring_schedules(client: ShellyClient, config: ShellyConfig, sunrise_time: datetime, sunset_time: datetime) -> None:
     if config.enable_sunset_automation:
-        sunset_cron = f"{sunset_time.minute} {sunset_time.hour} * * *"
+        sunset_cron = f"0 {sunset_time.minute} {sunset_time.hour} * * *"
         sunset_id = client.create_schedule(
             timespec=sunset_cron,
             switch_id=config.switch_id,
@@ -73,7 +73,7 @@ def create_recurring_schedules(client: ShellyClient, config: ShellyConfig, sunri
         )
         logger.success(f"Created recurring sunset schedule: {sunset_time.strftime('%H:%M')} → Turn ON daily (ID: {sunset_id})")
 
-    sunrise_cron = f"{sunrise_time.minute} {sunrise_time.hour} * * *"
+    sunrise_cron = f"0 {sunrise_time.minute} {sunrise_time.hour} * * *"
     sunrise_id = client.create_schedule(
         timespec=sunrise_cron,
         switch_id=config.switch_id,

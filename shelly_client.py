@@ -63,11 +63,6 @@ class ShellyClient:
         logger.info(f"Firmware: {info.get('ver', 'unknown')} (app: {info.get('app', 'unknown')})")
         return info
 
-    def get_status(self) -> Dict[str, Any]:
-        """Get device status."""
-        logger.debug("Fetching device status...")
-        return self._rpc_call("Shelly.GetStatus")
-
     def list_schedules(self) -> List[Dict[str, Any]]:
         """List all schedules."""
         logger.info("Fetching schedule list from device...")
@@ -140,23 +135,3 @@ class ShellyClient:
             logger.success(f"Schedule created with ID {schedule_id}: Switch {switch_id} → {action} at {timespec}")
 
         return schedule_id
-
-    def verify_schedules(self) -> List[Dict[str, Any]]:
-        """Verify and display schedules."""
-        logger.info("Verifying configured schedules on device...")
-
-        schedules = self.list_schedules()
-
-        if not schedules:
-            logger.warning("No schedules found on device!")
-            return []
-
-        logger.success(f"Verified {len(schedules)} schedule(s) configured on device:")
-        for schedule in schedules:
-            schedule_id = schedule.get("id", "?")
-            enabled = schedule.get("enable", False)
-            timespec = schedule.get("timespec", "?")
-            status = "enabled" if enabled else "disabled"
-            logger.info(f"  → Schedule #{schedule_id}: {timespec} ({status})")
-
-        return schedules
