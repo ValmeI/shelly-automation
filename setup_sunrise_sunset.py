@@ -11,11 +11,12 @@ from config import ShellyConfig
 from logging_config import init_logging
 from shelly_client import ShellyClient
 
+SWITCH_ID = 0
+
 
 def log_configuration(config: ShellyConfig) -> None:
     logger.info("Configuration loaded successfully:")
     logger.info(f"  Device IP: {config.shelly_ip}")
-    logger.info(f"  Switch ID: {config.switch_id}")
     logger.info(f"  Location: {config.latitude}, {config.longitude}")
     logger.info(f"  Timezone: {config.timezone}")
     logger.info(f"  Schedules: {len(config.get_schedules())} defined")
@@ -74,7 +75,7 @@ def create_recurring_schedules(client: ShellyClient, config: ShellyConfig, times
         turn_on = schedule.action == "on"
         action_desc = "Turn ON" if turn_on else "Turn OFF"
 
-        schedule_id = client.create_schedule(timespec=cron, switch_id=config.switch_id, turn_on=turn_on)
+        schedule_id = client.create_schedule(timespec=cron, switch_id=SWITCH_ID, turn_on=turn_on)
 
         logger.success(f"Created schedule: {schedule_time.strftime('%H:%M')} ({time_desc}) → {action_desc} (ID: {schedule_id})")
 
@@ -131,11 +132,10 @@ def main() -> None:
         log_configuration(config)
 
         client = ShellyClient(config.shelly_ip)
-        client.get_device_info()
 
-        show_existing_schedules(client)
+        existing_schedules = show_existing_schedules(client)
 
-        client.delete_all_schedules()
+        client.delete_all_schedules(existing_schedules)
 
         times = calculate_schedule_times(config)
 

@@ -55,21 +55,10 @@ class ShellyClient:
             logger.error(f"Invalid response from Shelly device: {e}")
             raise
 
-    def get_device_info(self) -> Dict[str, Any]:
-        """Get device information."""
-        logger.info("Fetching device information...")
-        info = self._rpc_call("Shelly.GetDeviceInfo")
-        logger.info(f"Device: {info.get('model', 'unknown')} (ID: {info.get('id', 'unknown')})")
-        logger.info(f"Firmware: {info.get('ver', 'unknown')} (app: {info.get('app', 'unknown')})")
-        return info
-
     def list_schedules(self) -> List[Dict[str, Any]]:
         """List all schedules."""
-        logger.info("Fetching schedule list from device...")
         result = self._rpc_call("Schedule.List")
-        schedules = result.get("jobs", [])
-        logger.info(f"Retrieved {len(schedules)} schedule(s) from device")
-        return schedules
+        return result.get("jobs", [])
 
     def delete_schedule(self, schedule_id: int) -> None:
         """Delete a schedule by ID."""
@@ -77,11 +66,11 @@ class ShellyClient:
         self._rpc_call("Schedule.Delete", {"id": schedule_id})
         logger.info(f"Schedule ID {schedule_id} deleted successfully")
 
-    def delete_all_schedules(self) -> int:
+    def delete_all_schedules(self, schedules: List[Dict[str, Any]] | None = None) -> int:
         """Delete all existing schedules. Returns number of schedules deleted."""
-        logger.info("Checking for existing schedules to delete...")
+        if schedules is None:
+            schedules = self.list_schedules()
 
-        schedules = self.list_schedules()
         if not schedules:
             logger.info("No schedules to delete")
             return 0

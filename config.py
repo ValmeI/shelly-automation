@@ -17,7 +17,6 @@ class ShellyConfig(BaseModel):
     """Configuration for Shelly automation. All fields required (fail-fast)."""
 
     shelly_ip: str = Field(..., description="Device IP address")
-    switch_id: int = Field(..., description="Switch ID (usually 0)")
 
     latitude: float = Field(..., description="Location latitude")
     longitude: float = Field(..., description="Location longitude")

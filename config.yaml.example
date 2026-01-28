@@ -1,6 +1,5 @@
 # Shelly Device Configuration
 shelly_ip: 192.168.50.191
-switch_id: 0
 
 # Location Configuration (Tallinn, Estonia)
 latitude: 59.437
