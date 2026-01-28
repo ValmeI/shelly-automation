@@ -1,5 +1,5 @@
-# Environment configuration
-.env
+# Configuration
+config.yaml
 
 # Logs
 logs/

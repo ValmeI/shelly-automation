@@ -1,8 +1,19 @@
-from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings
+from pathlib import Path
+from typing import List, Literal
+
+import yaml
+from pydantic import BaseModel, Field, field_validator
 
 
-class ShellyConfig(BaseSettings):
+class Schedule(BaseModel):
+    """Single schedule definition."""
+
+    time: str = Field(..., description="Time: 'HH:MM', 'sunrise', or 'sunset'")
+    action: Literal["on", "off"] = Field(..., description="Turn switch on or off")
+    offset: int = Field(0, description="Minutes offset for sunrise/sunset (+ after, - before)")
+
+
+class ShellyConfig(BaseModel):
     """Configuration for Shelly automation. All fields required (fail-fast)."""
 
     shelly_ip: str = Field(..., description="Device IP address")
@@ -12,8 +23,7 @@ class ShellyConfig(BaseSettings):
     longitude: float = Field(..., description="Location longitude")
     timezone: str = Field(..., description="Timezone e.g. Europe/Tallinn")
 
-    sunrise_offset: int = Field(..., description="Minutes offset: + after, - before")
-    enable_sunset_automation: bool = Field(..., description="Enable automatic turn ON at sunset")
+    schedules: List[Schedule] = Field(..., description="List of schedule definitions")
 
     log_level: str = Field(..., description="DEBUG, INFO, WARNING, ERROR")
     log_file: str = Field(..., description="Path to log file")
@@ -43,5 +53,18 @@ class ShellyConfig(BaseSettings):
             raise ValueError(f"longitude must be between -180 and 180, got: {v}")
         return v
 
-    class Config:
-        env_file = ".env"
+    @classmethod
+    def from_yaml(cls, path: str = "config.yaml") -> "ShellyConfig":
+        """Load configuration from YAML file."""
+        config_path = Path(path)
+        if not config_path.exists():
+            raise FileNotFoundError(f"Config file not found: {path}")
+
+        with open(config_path, "r") as f:
+            data = yaml.safe_load(f)
+
+        return cls(**data)
+
+    def get_schedules(self) -> List[Schedule]:
+        """Return schedule list."""
+        return self.schedules

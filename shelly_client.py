@@ -99,14 +99,7 @@ class ShellyClient:
         logger.info(f"Deleted {deleted_count} schedule(s)")
         return deleted_count
 
-    def create_schedule(
-        self,
-        timespec: str,
-        switch_id: int,
-        turn_on: bool,
-        enabled: bool = True,
-        condition_if_on: bool = False
-    ) -> int:
+    def create_schedule(self, timespec: str, switch_id: int, turn_on: bool, enabled: bool = True, condition_if_on: bool = False) -> int:
         """Create a new schedule. Returns created schedule ID."""
         action = "ON" if turn_on else "OFF"
 
@@ -115,16 +108,10 @@ class ShellyClient:
         else:
             logger.info(f"Creating schedule: Switch {switch_id} turn {action} at {timespec}")
 
-        params = {
-            "enable": enabled,
-            "timespec": timespec,
-            "calls": [{"method": "Switch.Set", "params": {"id": switch_id, "on": turn_on}}]
-        }
+        params = {"enable": enabled, "timespec": timespec, "calls": [{"method": "Switch.Set", "params": {"id": switch_id, "on": turn_on}}]}
 
         if condition_if_on:
-            params["condition"] = {
-                "cmp": {"a": f"switch:{switch_id}.output", "b": True, "op": "=="}
-            }
+            params["condition"] = {"cmp": {"a": f"switch:{switch_id}.output", "b": True, "op": "=="}}
 
         result = self._rpc_call("Schedule.Create", params)
         schedule_id = result.get("id", -1)

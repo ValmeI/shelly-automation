@@ -1,0 +1,27 @@
+# Shelly Device Configuration
+shelly_ip: 192.168.50.191
+switch_id: 0
+
+# Location Configuration (Tallinn, Estonia)
+latitude: 59.437
+longitude: 24.7536
+timezone: Europe/Tallinn
+
+# Schedules
+# Each schedule:
+#   - time: "HH:MM" (fixed time), "sunrise", or "sunset"
+#   - action: "on" or "off"
+#   - offset: minutes (optional, for sunrise/sunset, + after / - before)
+schedules:
+  - time: "07:00"
+    action: "on"
+  - time: sunrise
+    offset: 0
+    action: "off"
+  - time: sunset
+    offset: 0
+    action: "on"
+
+# Logging
+log_level: INFO
+log_file: logs/shelly_automation.log

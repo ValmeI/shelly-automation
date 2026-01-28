@@ -18,8 +18,7 @@ def log_configuration(config: ShellyConfig) -> None:
     logger.info(f"  Switch ID: {config.switch_id}")
     logger.info(f"  Location: {config.latitude}, {config.longitude}")
     logger.info(f"  Timezone: {config.timezone}")
-    logger.info(f"  Sunrise offset: {config.sunrise_offset} minutes")
-    logger.info(f"  Enable sunset automation: {config.enable_sunset_automation}")
+    logger.info(f"  Schedules: {len(config.get_schedules())} defined")
     logger.info(f"  Log level: {config.log_level}")
 
 
@@ -31,55 +30,53 @@ def show_existing_schedules(client: ShellyClient) -> list:
     else:
         logger.info(f"Found {len(schedules)} existing schedule(s):")
         for schedule in schedules:
-            schedule_id = schedule.get('id')
-            timespec = schedule.get('timespec')
-            enabled = schedule.get('enable')
-            call = schedule.get('calls', [{}])[0]
-            switch_id = call.get('params', {}).get('id')
-            turn_on = call.get('params', {}).get('on')
-            action = 'ON' if turn_on else 'OFF'
-            status = 'enabled' if enabled else 'disabled'
+            schedule_id = schedule.get("id")
+            timespec = schedule.get("timespec")
+            enabled = schedule.get("enable")
+            call = schedule.get("calls", [{}])[0]
+            switch_id = call.get("params", {}).get("id")
+            turn_on = call.get("params", {}).get("on")
+            action = "ON" if turn_on else "OFF"
+            status = "enabled" if enabled else "disabled"
             logger.info(f"  - ID {schedule_id}: {timespec} → Switch {switch_id} = {action} ({status})")
     return schedules
 
 
-def calculate_sunrise_sunset_times(config: ShellyConfig) -> tuple[datetime, datetime]:
+def calculate_schedule_times(config: ShellyConfig) -> dict[str, datetime]:
     observer = Observer(latitude=config.latitude, longitude=config.longitude)
-
-    logger.info("Calculating today's sunrise/sunset times...")
-    logger.info("")
-
     tz = ZoneInfo(config.timezone)
     today = datetime.now(tz)
     s = sun(observer, date=today, tzinfo=tz)
 
-    sunrise_time = s['sunrise'] + timedelta(minutes=config.sunrise_offset)
-    sunset_time = s['sunset']
-
-    logger.info(f"Today's times: Sunrise {s['sunrise'].strftime('%H:%M')} → Sunset {s['sunset'].strftime('%H:%M')}")
-    logger.info(f"With offset: Sunrise+{config.sunrise_offset}min = {sunrise_time.strftime('%H:%M')}")
+    logger.info("Calculating sunrise/sunset times...")
+    logger.info(f"  Sunrise: {s['sunrise'].strftime('%H:%M')}")
+    logger.info(f"  Sunset: {s['sunset'].strftime('%H:%M')}")
     logger.info("")
 
-    return sunrise_time, sunset_time
+    return {"sunrise": s["sunrise"], "sunset": s["sunset"]}
 
 
-def create_recurring_schedules(client: ShellyClient, config: ShellyConfig, sunrise_time: datetime, sunset_time: datetime) -> None:
-    if config.enable_sunset_automation:
-        sunset_cron = f"0 {sunset_time.minute} {sunset_time.hour} * * *"
-        sunset_id = client.create_schedule(
-            timespec=sunset_cron,
-            switch_id=config.switch_id,
-            turn_on=True
-        )
-        logger.success(f"Created recurring sunset schedule: {sunset_time.strftime('%H:%M')} → Turn ON daily (ID: {sunset_id})")
+def create_recurring_schedules(client: ShellyClient, config: ShellyConfig, times: dict[str, datetime]) -> None:
+    schedules = config.get_schedules()
+    tz = ZoneInfo(config.timezone)
 
-    sunrise_cron = f"0 {sunrise_time.minute} {sunrise_time.hour} * * *"
-    sunrise_id = client.create_schedule(
-        timespec=sunrise_cron,
-        switch_id=config.switch_id,
-        turn_on=False
-    )
-    logger.success(f"Created recurring sunrise schedule: {sunrise_time.strftime('%H:%M')} → Turn OFF daily (ID: {sunrise_id})")
+    for schedule in schedules:
+        if schedule.time in ["sunrise", "sunset"]:
+            base_time = times[schedule.time]
+            schedule_time = base_time + timedelta(minutes=schedule.offset)
+            time_desc = f"{schedule.time}+{schedule.offset}min" if schedule.offset != 0 else schedule.time
+        else:
+            hour, minute = map(int, schedule.time.split(":"))
+            schedule_time = datetime.now(tz).replace(hour=hour, minute=minute, second=0, microsecond=0)
+            time_desc = schedule.time
+
+        cron = f"0 {schedule_time.minute} {schedule_time.hour} * * *"
+        turn_on = schedule.action == "on"
+        action_desc = "Turn ON" if turn_on else "Turn OFF"
+
+        schedule_id = client.create_schedule(timespec=cron, switch_id=config.switch_id, turn_on=turn_on)
+
+        logger.success(f"Created schedule: {schedule_time.strftime('%H:%M')} ({time_desc}) → {action_desc} (ID: {schedule_id})")
 
 
 def verify_schedules(client: ShellyClient, config: ShellyConfig) -> None:
@@ -90,7 +87,7 @@ def verify_schedules(client: ShellyClient, config: ShellyConfig) -> None:
 
     logger.info("")
     logger.info("=== VERIFICATION ===")
-    expected_count = 2 if config.enable_sunset_automation else 1
+    expected_count = len(config.get_schedules())
     if len(schedules_after) != expected_count:
         logger.error(f"Expected {expected_count} schedule(s) but found {len(schedules_after)}!")
         sys.exit(1)
@@ -99,16 +96,28 @@ def verify_schedules(client: ShellyClient, config: ShellyConfig) -> None:
     logger.info(f"✓ Schedules are recurring daily (will trigger every day at the same time)")
 
 
-def show_summary(config: ShellyConfig, sunrise_time: datetime, sunset_time: datetime) -> None:
+def show_summary(config: ShellyConfig, times: dict[str, datetime]) -> None:
     logger.info("")
     logger.success("✓ Configuration complete!")
     logger.info("")
     logger.info("=== SCHEDULE SUMMARY ===")
 
+    schedules = config.get_schedules()
+    tz = ZoneInfo(config.timezone)
+
     logger.info("Recurring daily schedules:")
-    if config.enable_sunset_automation:
-        logger.info(f"  • {sunset_time.strftime('%H:%M')} - Turn lights ON (every day)")
-    logger.info(f"  • {sunrise_time.strftime('%H:%M')} - Turn lights OFF (every day)")
+    for schedule in schedules:
+        if schedule.time in ["sunrise", "sunset"]:
+            base_time = times[schedule.time]
+            schedule_time = base_time + timedelta(minutes=schedule.offset)
+            time_desc = f"{schedule.time}+{schedule.offset}min" if schedule.offset != 0 else schedule.time
+        else:
+            hour, minute = map(int, schedule.time.split(":"))
+            schedule_time = datetime.now(tz).replace(hour=hour, minute=minute, second=0, microsecond=0)
+            time_desc = schedule.time
+
+        action_desc = "Turn ON" if schedule.action == "on" else "Turn OFF"
+        logger.info(f"  • {schedule_time.strftime('%H:%M')} ({time_desc}) - {action_desc}")
 
     logger.info("")
     logger.info("Note: Times will drift ~2 minutes per day as sunrise/sunset changes")
@@ -117,7 +126,7 @@ def show_summary(config: ShellyConfig, sunrise_time: datetime, sunset_time: date
 def main() -> None:
     try:
         logger.info("Loading configuration...")
-        config = ShellyConfig()
+        config = ShellyConfig.from_yaml()
 
         log_configuration(config)
 
@@ -128,13 +137,13 @@ def main() -> None:
 
         client.delete_all_schedules()
 
-        sunrise_time, sunset_time = calculate_sunrise_sunset_times(config)
+        times = calculate_schedule_times(config)
 
-        create_recurring_schedules(client, config, sunrise_time, sunset_time)
+        create_recurring_schedules(client, config, times)
 
         verify_schedules(client, config)
 
-        show_summary(config, sunrise_time, sunset_time)
+        show_summary(config, times)
 
     except Exception as e:
         logger.exception(f"Configuration failed: {e}")
@@ -145,13 +154,13 @@ if __name__ == "__main__":
     colorama_init(autoreset=True)
 
     try:
-        config = ShellyConfig()
+        config = ShellyConfig.from_yaml()
         init_logging(config.log_level, config.log_file)
     except Exception as e:
         init_logging("INFO")
         logger.error(f"Failed to load configuration: {e}")
-        logger.error("Make sure you have created a .env file with all required settings.")
-        logger.error("Copy .env.example to .env and fill in your values.")
+        logger.error("Make sure you have created a config.yaml file with all required settings.")
+        logger.error("Copy config.yaml.example to config.yaml and fill in your values.")
         sys.exit(1)
 
     main()
