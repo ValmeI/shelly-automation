@@ -1,14 +1,12 @@
 import sys
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+from datetime import datetime
 
-from astral import Observer
-from astral.sun import sun
 from colorama import init as colorama_init
 from loguru import logger
 
 from config import ShellyConfig
 from logging_config import init_logging
+from schedule_calculator import calculate_schedule_time, calculate_sun_times, get_schedule_description, time_to_cron
 from shelly_client import ShellyClient
 
 SWITCH_ID = 0
@@ -43,41 +41,16 @@ def show_existing_schedules(client: ShellyClient) -> list:
     return schedules
 
 
-def calculate_schedule_times(config: ShellyConfig) -> dict[str, datetime]:
-    observer = Observer(latitude=config.latitude, longitude=config.longitude)
-    tz = ZoneInfo(config.timezone)
-    today = datetime.now(tz)
-    s = sun(observer, date=today, tzinfo=tz)
-
-    logger.info("Calculating sunrise/sunset times...")
-    logger.info(f"  Sunrise: {s['sunrise'].strftime('%H:%M')}")
-    logger.info(f"  Sunset: {s['sunset'].strftime('%H:%M')}")
-    logger.info("")
-
-    return {"sunrise": s["sunrise"], "sunset": s["sunset"]}
-
-
-def create_recurring_schedules(client: ShellyClient, config: ShellyConfig, times: dict[str, datetime]) -> None:
-    schedules = config.get_schedules()
-    tz = ZoneInfo(config.timezone)
-
-    for schedule in schedules:
-        if schedule.time in ["sunrise", "sunset"]:
-            base_time = times[schedule.time]
-            schedule_time = base_time + timedelta(minutes=schedule.offset)
-            time_desc = f"{schedule.time}+{schedule.offset}min" if schedule.offset != 0 else schedule.time
-        else:
-            hour, minute = map(int, schedule.time.split(":"))
-            schedule_time = datetime.now(tz).replace(hour=hour, minute=minute, second=0, microsecond=0)
-            time_desc = schedule.time
-
-        cron = f"0 {schedule_time.minute} {schedule_time.hour} * * *"
+def create_schedules(client: ShellyClient, config: ShellyConfig, sun_times: dict[str, datetime]) -> None:
+    """Create schedules on device."""
+    for schedule in config.get_schedules():
+        schedule_time = calculate_schedule_time(schedule, sun_times, config.timezone)
+        cron = time_to_cron(schedule_time)
         turn_on = schedule.action == "on"
-        action_desc = "Turn ON" if turn_on else "Turn OFF"
 
         schedule_id = client.create_schedule(timespec=cron, switch_id=SWITCH_ID, turn_on=turn_on)
-
-        logger.success(f"Created schedule: {schedule_time.strftime('%H:%M')} ({time_desc}) → {action_desc} (ID: {schedule_id})")
+        description = get_schedule_description(schedule, schedule_time)
+        logger.success(f"Created: {description} (ID: {schedule_id})")
 
 
 def verify_schedules(client: ShellyClient, config: ShellyConfig) -> None:
@@ -97,30 +70,15 @@ def verify_schedules(client: ShellyClient, config: ShellyConfig) -> None:
     logger.info(f"✓ Schedules are recurring daily (will trigger every day at the same time)")
 
 
-def show_summary(config: ShellyConfig, times: dict[str, datetime]) -> None:
+def show_summary(config: ShellyConfig, sun_times: dict[str, datetime]) -> None:
     logger.info("")
     logger.success("✓ Configuration complete!")
     logger.info("")
     logger.info("=== SCHEDULE SUMMARY ===")
 
-    schedules = config.get_schedules()
-    tz = ZoneInfo(config.timezone)
-
-    logger.info("Recurring daily schedules:")
-    for schedule in schedules:
-        if schedule.time in ["sunrise", "sunset"]:
-            base_time = times[schedule.time]
-            schedule_time = base_time + timedelta(minutes=schedule.offset)
-            time_desc = f"{schedule.time}+{schedule.offset}min" if schedule.offset != 0 else schedule.time
-        else:
-            hour, minute = map(int, schedule.time.split(":"))
-            schedule_time = datetime.now(tz).replace(hour=hour, minute=minute, second=0, microsecond=0)
-            time_desc = schedule.time
-
-        action_desc = "Turn ON" if schedule.action == "on" else "Turn OFF"
-        logger.info(f"  • {schedule_time.strftime('%H:%M')} ({time_desc}) - {action_desc}")
-
+    logger.info(f"Sun times today: Sunrise {sun_times['sunrise'].strftime('%H:%M')}, Sunset {sun_times['sunset'].strftime('%H:%M')}")
     logger.info("")
+    logger.info(f"Created {len(config.get_schedules())} recurring daily schedules")
     logger.info("Note: Times will drift ~2 minutes per day as sunrise/sunset changes")
 
 
@@ -135,15 +93,23 @@ def main() -> None:
 
         existing_schedules = show_existing_schedules(client)
 
-        client.delete_all_schedules(existing_schedules)
+        if existing_schedules:
+            deleted_count = client.delete_all_schedules(existing_schedules)
+            logger.info(f"Deleted {deleted_count} existing schedule(s)")
+            logger.info("")
 
-        times = calculate_schedule_times(config)
+        logger.info("Calculating sunrise/sunset times...")
+        sun_times = calculate_sun_times(config.latitude, config.longitude, config.timezone)
+        logger.info(f"  Sunrise: {sun_times['sunrise'].strftime('%H:%M')}")
+        logger.info(f"  Sunset: {sun_times['sunset'].strftime('%H:%M')}")
+        logger.info("")
 
-        create_recurring_schedules(client, config, times)
+        logger.info("Creating schedules...")
+        create_schedules(client, config, sun_times)
 
         verify_schedules(client, config)
 
-        show_summary(config, times)
+        show_summary(config, sun_times)
 
     except Exception as e:
         logger.exception(f"Configuration failed: {e}")

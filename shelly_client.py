@@ -62,9 +62,7 @@ class ShellyClient:
 
     def delete_schedule(self, schedule_id: int) -> None:
         """Delete a schedule by ID."""
-        logger.info(f"Deleting schedule ID {schedule_id}")
         self._rpc_call("Schedule.Delete", {"id": schedule_id})
-        logger.info(f"Schedule ID {schedule_id} deleted successfully")
 
     def delete_all_schedules(self, schedules: List[Dict[str, Any]] | None = None) -> int:
         """Delete all existing schedules. Returns number of schedules deleted."""
@@ -72,7 +70,6 @@ class ShellyClient:
             schedules = self.list_schedules()
 
         if not schedules:
-            logger.info("No schedules to delete")
             return 0
 
         deleted_count = 0
@@ -85,29 +82,14 @@ class ShellyClient:
                 except (requests.RequestException, ValueError) as e:
                     logger.warning(f"Failed to delete schedule {schedule_id}: {e}")
 
-        logger.info(f"Deleted {deleted_count} schedule(s)")
         return deleted_count
 
     def create_schedule(self, timespec: str, switch_id: int, turn_on: bool, enabled: bool = True, condition_if_on: bool = False) -> int:
         """Create a new schedule. Returns created schedule ID."""
-        action = "ON" if turn_on else "OFF"
-
-        if condition_if_on:
-            logger.info(f"Creating schedule: Switch {switch_id} turn {action} at {timespec} (only if currently ON)")
-        else:
-            logger.info(f"Creating schedule: Switch {switch_id} turn {action} at {timespec}")
-
         params = {"enable": enabled, "timespec": timespec, "calls": [{"method": "Switch.Set", "params": {"id": switch_id, "on": turn_on}}]}
 
         if condition_if_on:
             params["condition"] = {"cmp": {"a": f"switch:{switch_id}.output", "b": True, "op": "=="}}
 
         result = self._rpc_call("Schedule.Create", params)
-        schedule_id = result.get("id", -1)
-
-        if condition_if_on:
-            logger.success(f"Schedule created with ID {schedule_id}: Switch {switch_id} → {action} at {timespec} (conditional)")
-        else:
-            logger.success(f"Schedule created with ID {schedule_id}: Switch {switch_id} → {action} at {timespec}")
-
-        return schedule_id
+        return result.get("id", -1)
