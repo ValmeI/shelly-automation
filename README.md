@@ -8,12 +8,12 @@ Local sunrise/sunset automation for Shelly Gen 3 devices.
 pip install -r requirements.txt
 cp config.yaml.example config.yaml
 # Edit config.yaml with your device IP and schedules
-python setup_sunrise_sunset.py
+python main.py
 ```
 
 ## Maintenance
 
 Run weekly to update times:
 ```bash
-0 1 * * 0 cd /path/to/shelly-automation && python setup_sunrise_sunset.py
+0 1 * * 0 cd /path/to/shelly-automation && python main.py
 ```
