@@ -41,8 +41,11 @@ def show_existing_schedules(client: ShellyClient) -> list:
     return schedules
 
 
-def create_schedules(client: ShellyClient, config: ShellyConfig, sun_times: dict[str, datetime]) -> None:
-    """Create schedules on device."""
+def create_schedules(
+    client: ShellyClient, config: ShellyConfig, sun_times: dict[str, datetime]
+) -> list[tuple[datetime, str]]:
+    """Create schedules on device and return resolved times/actions."""
+    resolved: list[tuple[datetime, str]] = []
     for schedule in config.get_schedules():
         schedule_time = calculate_schedule_time(schedule, sun_times, config.timezone)
         cron = time_to_cron(schedule_time)
@@ -51,6 +54,9 @@ def create_schedules(client: ShellyClient, config: ShellyConfig, sun_times: dict
         schedule_id = client.create_schedule(timespec=cron, switch_id=SWITCH_ID, turn_on=turn_on)
         description = get_schedule_description(schedule, schedule_time)
         logger.success(f"Created: {description} (ID: {schedule_id})")
+        action = "ON" if turn_on else "OFF"
+        resolved.append((schedule_time, action))
+    return resolved
 
 
 def verify_schedules(client: ShellyClient, config: ShellyConfig) -> None:
@@ -70,7 +76,9 @@ def verify_schedules(client: ShellyClient, config: ShellyConfig) -> None:
     logger.info(f"✓ Schedules are recurring daily (will trigger every day at the same time)")
 
 
-def show_summary(config: ShellyConfig, sun_times: dict[str, datetime]) -> None:
+def show_summary(
+    config: ShellyConfig, sun_times: dict[str, datetime], resolved_times: list[tuple[datetime, str]]
+) -> None:
     logger.info("")
     logger.success("✓ Configuration complete!")
     logger.info("")
@@ -79,6 +87,10 @@ def show_summary(config: ShellyConfig, sun_times: dict[str, datetime]) -> None:
     logger.info(f"Sun times today: Sunrise {sun_times['sunrise'].strftime('%H:%M')}, Sunset {sun_times['sunset'].strftime('%H:%M')}")
     logger.info("")
     logger.info(f"Created {len(config.get_schedules())} recurring daily schedules")
+    if resolved_times:
+        logger.info("Added schedule times (today):")
+        for schedule_time, action in resolved_times:
+            logger.success(f"  - {schedule_time.strftime('%H:%M')} → Lights {action}")
     logger.info("Note: Times will drift ~2 minutes per day as sunrise/sunset changes")
 
 
@@ -105,11 +117,11 @@ def main() -> None:
         logger.info("")
 
         logger.info("Creating schedules...")
-        create_schedules(client, config, sun_times)
+        resolved_times = create_schedules(client, config, sun_times)
 
         verify_schedules(client, config)
 
-        show_summary(config, sun_times)
+        show_summary(config, sun_times, resolved_times)
 
     except Exception as e:
         logger.exception(f"Configuration failed: {e}")
