@@ -63,7 +63,8 @@ def main():
 
         now = datetime.now(tz)
         if target_time < now:
-            logger.warning(f"Skipping schedule {idx}: {target_time.strftime('%H:%M')} already passed")
+            desc = f"Lights {schedule.action.upper()} ({schedule.time}+{schedule.offset})"
+            logger.warning(f"Skipping: {desc} — {target_time.strftime('%H:%M')} already passed")
             continue
 
         time_str = target_time.strftime("%H:%M")
