@@ -24,3 +24,7 @@ schedules:
 # Logging
 log_level: INFO
 log_file: logs/shelly_automation.log
+
+# Retry settings
+max_retries: 3  # Number of retry attempts for switch control
+retry_wait: 2   # Seconds to wait between retries
