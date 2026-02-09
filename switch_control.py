@@ -86,7 +86,8 @@ def main():
         print("Error: Action must be 'on' or 'off'")
         sys.exit(1)
 
-    init_logging(level="INFO", log_file=None)
+    config = ShellyConfig.from_yaml()
+    init_logging(level=config.log_level, log_file=config.log_file)
 
     exit_code = control_switch(action)
     sys.exit(exit_code)

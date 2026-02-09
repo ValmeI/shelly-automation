@@ -68,7 +68,7 @@ def main():
             continue
 
         time_str = target_time.strftime("%H:%M")
-        switch_cmd = f"cd {project_path} && {python_path} switch_control.py {schedule.action} >> logs/at.log 2>&1"
+        switch_cmd = f"cd {project_path} && {python_path} switch_control.py {schedule.action} > /dev/null 2>&1"
 
         desc = f"Lights {schedule.action.upper()} ({schedule.time}+{schedule.offset})"
         if schedule_with_at(time_str, switch_cmd, desc):
