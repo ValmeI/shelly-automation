@@ -50,6 +50,26 @@ def attempt_switch_control(client: ShellyClient, desired_state: bool, action_nam
     return retryer(set_switch_and_verify, client, desired_state, action_name)
 
 
+def connect_and_check(client: ShellyClient, desired_state: bool, action_name: str, max_retries: int, retry_wait: int) -> int:
+    retryer = Retrying(
+        stop=stop_after_attempt(max_retries),
+        wait=wait_fixed(retry_wait),
+        retry=retry_if_result(lambda r: r is None),
+        before_sleep=before_sleep_log(logger, "WARNING")
+    )
+
+    current_state = retryer(get_switch_state, client)
+    if current_state is None:
+        logger.error(f"Cannot determine switch state after {max_retries} attempts")
+        return 2
+
+    if current_state == desired_state:
+        logger.info(f"Lights already {action_name} - no action needed")
+        return 1
+
+    return -1
+
+
 def control_switch(action: Literal["on", "off"]) -> int:
     config = ShellyConfig.from_yaml()
     client = ShellyClient(config.shelly_ip)
@@ -59,20 +79,15 @@ def control_switch(action: Literal["on", "off"]) -> int:
 
     logger.info(f"Target: Turn lights {action_name}")
 
-    current_state = get_switch_state(client)
-    if current_state is None:
-        logger.error("Cannot determine current switch state")
-        return 2
-
-    if current_state == desired_state:
-        logger.info(f"✓ Lights already {action_name} - no action needed")
-        return 1
+    check_result = connect_and_check(client, desired_state, action_name, config.max_retries, config.retry_wait)
+    if check_result >= 0:
+        return check_result
 
     try:
         success = attempt_switch_control(client, desired_state, action_name, config.max_retries, config.retry_wait)
         return 0 if success else 2
     except Exception:
-        logger.error(f"✗ Failed to turn lights {action_name} after {config.max_retries} attempts")
+        logger.error(f"Failed to turn lights {action_name} after {config.max_retries} attempts")
         return 2
 
 
