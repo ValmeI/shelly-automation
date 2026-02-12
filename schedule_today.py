@@ -75,9 +75,12 @@ def main():
             scheduled_count += 1
 
     logger.info("")
-    logger.success(f"✓ Scheduled {scheduled_count} job(s) for today")
-    logger.info("Run 'atq' to see scheduled jobs")
-    logger.info("Run 'atrm <job_id>' to remove a job")
+    if scheduled_count > 0:
+        logger.success(f"✓ Scheduled {scheduled_count} job(s) for today")
+        logger.info("Run 'atq' to see scheduled jobs")
+        logger.info("Run 'atrm <job_id>' to remove a job")
+    else:
+        logger.warning("No jobs scheduled — all times already passed")
 
 
 if __name__ == "__main__":
