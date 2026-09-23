@@ -7,7 +7,7 @@ set -euo pipefail
 # --- Configuration ---
 REMOTE_HOST="${HOMELAB_HOST:-homelab.local}"
 SSH_KEY="${HOMELAB_SSH_KEY:-$HOME/.ssh/id_homelab}"
-REMOTE_APP_DIR="/opt/shelly-automation"
+REMOTE_APP_DIR="/home/valme/git/shelly-automation"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DRY_RUN=false
 

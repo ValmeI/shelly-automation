@@ -3,7 +3,7 @@
 # Deployed by deploy.sh
 
 LOCKFILE="/tmp/shelly_scheduler.lock"
-APP_DIR="/opt/shelly-automation"
+APP_DIR="/home/valme/git/shelly-automation"
 
 # Check if already running (with stale lock detection)
 if [ -e "$LOCKFILE" ]; then

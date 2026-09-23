@@ -48,8 +48,8 @@ schedules:
 ```bash
 ssh homelab.local
 atq                          # Check scheduled jobs
-tail -f /opt/shelly-automation/logs/scheduler.log
+tail -f /home/valme/git/shelly-automation/logs/scheduler.log
 
 # Manual test
-cd /opt/shelly-automation && source .venv/bin/activate && python switch_control.py on
+cd /home/valme/git/shelly-automation && source .venv/bin/activate && python switch_control.py on
 ```
