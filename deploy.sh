@@ -124,15 +124,17 @@ if ! remote_exec "cd $REMOTE_APP_DIR && git pull" \
 fi
 log_success "Code updated from GitHub"
 
+# uv lives in ~/.local/bin, which a non-interactive ssh shell doesn't have on PATH
+UV="\$HOME/.local/bin/uv"
+
 # Setup Python venv if not exists
 if ! remote_exec "test -d $REMOTE_APP_DIR/.venv" > /dev/null 2>&1; then
     log "Creating Python virtual environment..."
-    remote_exec "cd $REMOTE_APP_DIR && python3 -m venv .venv"
-    remote_exec "cd $REMOTE_APP_DIR && source .venv/bin/activate && pip install --upgrade pip"
+    remote_exec "cd $REMOTE_APP_DIR && $UV venv .venv"
 fi
 
 # Install/update dependencies
-remote_exec "cd $REMOTE_APP_DIR && source .venv/bin/activate && pip install -r requirements.txt" \
+remote_exec "cd $REMOTE_APP_DIR && $UV pip install --python .venv/bin/python -r requirements.txt" \
     "Installing Python dependencies..."
 log_success "Dependencies installed"
 
